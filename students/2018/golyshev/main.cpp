@@ -108,26 +108,57 @@ struct PrintVisitor : public AstBaseVisitor {
     }
 
     void visitBlockNode(BlockNode* node) override {
-        Scope::VarIterator varIterator(node->scope());
-        while (varIterator.hasNext()) {
+        Scope::FunctionIterator funIterator(node->scope());
+        iterate(funIterator, [&](AstFunction* fun) {
             indent();
-            AstVar* var = varIterator.next();
+            fun->node()->visit(this);
+            _buffer << endl;
+        });
+
+        Scope::VarIterator varIterator(node->scope());
+        iterate(varIterator, [&](AstVar* var) {
+            indent();
             _buffer << var->type() 
                     << " "
                     << var->name()
                     << ";"
                     << endl;
-        }
-
+        });
+        
         for (size_t i = 0; i < node->nodes(); i++) {
             indent();
             AstNode* currNode = node->nodeAt(i);
             currNode->visit(this);
-            if (!(currNode->isForNode() || currNode->isWhileNode() || currNode->isIfNode())) {
+            if (!(currNode->isForNode() 
+                || currNode->isWhileNode() 
+                || currNode->isIfNode()
+                || currNode->isFunctionNode())) {
                 _buffer << ";";
             }
             _buffer << endl;
         }
+    }
+
+    void visitFunctionNode(FunctionNode* node) override {
+        if (node->name() == AstFunction::top_name) {
+            visitTopBlock(node->body());
+            return;
+        }
+
+        _buffer << "function " << node->returnType() << " " <<  node->name() << "("; 
+
+        printWithSeparator(node->parametersNumber(), [&](size_t i) {
+            _buffer << node->parameterType(i) << " " << node->parameterName(i);
+        });
+
+        _buffer << ") {" << endl;
+        
+        increaseIndent();
+        node->body()->visit(this);
+        decreaseIndent();
+
+        indent();
+        _buffer << "}";
     }
 
     void visitStoreNode(StoreNode* node) override {
@@ -208,15 +239,9 @@ struct PrintVisitor : public AstBaseVisitor {
     void visitCallNode(CallNode* node) {
         _buffer << node->name() << "(";
 
-        bool first = true;
-        for (size_t i = 0; i < node->parametersNumber(); i++) {
-            if (!first) {
-                _buffer << ", ";
-            }
-            
+        printWithSeparator(node->parametersNumber(), [&](size_t i) {
             node->parameterAt(i)->visit(this);
-            first = false;
-        }
+        });
 
         cout << ")";
     }
@@ -224,23 +249,49 @@ struct PrintVisitor : public AstBaseVisitor {
     void visitPrintNode(PrintNode* node) {
         _buffer << "print(";
 
-        bool first = true;
-        for (size_t i = 0; i < node->operands(); i++) {
-            if (!first) {
-                _buffer << ", ";
-            }
-            
+        printWithSeparator(node->operands(), [&](size_t i) {
             node->operandAt(i)->visit(this);
-            first = false;
-        }
+        });
 
         cout << ")";
+    }
+
+    void visitReturnNode(ReturnNode* node) {
+        _buffer << "return";
+        if (node->returnExpr()) {
+            _buffer << " ";
+            node->returnExpr()->visit(this);
+        }
     }
 
 private:
     ostream& _buffer;
     const size_t _indentSize;
     size_t _indent { 0 };
+
+    void visitTopBlock(BlockNode* node) {
+        visitBlockNode(node);
+    }
+
+    template <typename Printer>
+    void printWithSeparator(size_t times, Printer const& p) {
+        bool first = true;
+        for (size_t i = 0; i < times; i++) {
+            if (!first) {
+                _buffer << ", ";
+            }
+
+            p(i);
+            first = false;
+        }
+    }
+
+    template <typename Iterator, typename Consumer>
+    void iterate(Iterator& it, Consumer const& p) {
+        while (it.hasNext()) {
+            p(it.next());
+        }
+    }
 
     void indent() {
         _buffer << string(_indent, ' ');
