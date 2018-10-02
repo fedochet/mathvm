@@ -119,17 +119,23 @@ struct PrintVisitor : public AstBaseVisitor {
                     << endl;
         }
 
-        node->visitChildren(this);
+        for (size_t i = 0; i < node->nodes(); i++) {
+            indent();
+            AstNode* currNode = node->nodeAt(i);
+            currNode->visit(this);
+            if (!(currNode->isForNode() || currNode->isWhileNode() || currNode->isIfNode())) {
+                _buffer << ";";
+            }
+            _buffer << endl;
+        }
     }
 
     void visitStoreNode(StoreNode* node) override {
-        indent();
         _buffer << node->var()->name() 
                 << ' ' 
                 << node->op() 
                 << ' ';
         node->value()->visit(this);
-        _buffer << ";" << endl;
     }
 
     void visitStringLiteralNode(StringLiteralNode* node) override {
@@ -149,7 +155,6 @@ struct PrintVisitor : public AstBaseVisitor {
     }
 
     void visitForNode(ForNode* node) override {
-        indent();
         _buffer << "for (" << node->var()->name() << " in ";
         node->inExpr()->visit(this);
         _buffer << ") {" << endl; 
@@ -163,7 +168,6 @@ struct PrintVisitor : public AstBaseVisitor {
     }
 
     void visitWhileNode(WhileNode* node) override {
-        indent();
         _buffer << "while (";
         node->whileExpr()->visit(this);
         _buffer << ") {" << endl; 
@@ -199,7 +203,6 @@ struct PrintVisitor : public AstBaseVisitor {
             _buffer << "}";
         }
 
-        _buffer << endl;
     }
 
     void visitCallNode(CallNode* node) {
@@ -219,7 +222,6 @@ struct PrintVisitor : public AstBaseVisitor {
     }
 
     void visitPrintNode(PrintNode* node) {
-        indent();
         _buffer << "print(";
 
         bool first = true;
@@ -232,7 +234,7 @@ struct PrintVisitor : public AstBaseVisitor {
             first = false;
         }
 
-        cout << ");" << endl;
+        cout << ")";
     }
 
 private:
