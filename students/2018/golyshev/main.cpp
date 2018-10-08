@@ -108,13 +108,6 @@ struct PrintVisitor : public AstBaseVisitor {
     }
 
     void visitBlockNode(BlockNode* node) override {
-        Scope::FunctionIterator funIterator(node->scope());
-        iterate(funIterator, [&](AstFunction* fun) {
-            indent();
-            fun->node()->visit(this);
-            _buffer << endl;
-        });
-
         Scope::VarIterator varIterator(node->scope());
         iterate(varIterator, [&](AstVar* var) {
             indent();
@@ -124,10 +117,20 @@ struct PrintVisitor : public AstBaseVisitor {
                     << ";"
                     << endl;
         });
+
+        Scope::FunctionIterator funIterator(node->scope());
+        iterate(funIterator, [&](AstFunction* fun) {
+            indent();
+            fun->node()->visit(this);
+            _buffer << endl;
+        });
         
         for (size_t i = 0; i < node->nodes(); i++) {
-            indent();
             AstNode* currNode = node->nodeAt(i);
+            if (currNode->isNativeCallNode()) continue;
+            
+            indent();
+            
             currNode->visit(this);
             if (!(currNode->isForNode() 
                 || currNode->isWhileNode() 
@@ -135,6 +138,7 @@ struct PrintVisitor : public AstBaseVisitor {
                 || currNode->isFunctionNode())) {
                 _buffer << ";";
             }
+
             _buffer << endl;
         }
     }
@@ -170,7 +174,7 @@ struct PrintVisitor : public AstBaseVisitor {
     }
 
     void visitStringLiteralNode(StringLiteralNode* node) override {
-        _buffer << '"' << escape(node->literal()) << '"';
+        _buffer << "'" << escape(node->literal()) << "'";
     }
 
     void visitDoubleLiteralNode(DoubleLiteralNode* node) override {
