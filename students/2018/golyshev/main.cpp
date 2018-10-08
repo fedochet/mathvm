@@ -37,16 +37,16 @@ ostream& operator<<(ostream& o, VarType type) {
 
 ostream& operator<<(ostream& o, TokenKind kind) {
     #define PRINT_OP(t, s, p) \
-        case t: o << s; \
+        case t: o << (s); \
         break;
 
     switch (kind) {
         case tTokenCount: break;
         FOR_TOKENS(PRINT_OP)
     }
-    
+
     #undef PRINT_OP
-    
+
     return o;
 }
 
@@ -69,7 +69,7 @@ string escape(const string& s) {
             case '\'':
                 ss << "\\'";
                 break;
-            default: 
+            default:
                 ss << c;
         }
     }
@@ -87,10 +87,8 @@ string loadFile(const string& filename) {
 }
 
 struct PrintVisitor : public AstBaseVisitor {
-    PrintVisitor(ostream& buffer, size_t indentSize = 4): 
+    explicit PrintVisitor(ostream& buffer, size_t indentSize = 4):
         _buffer(buffer), _indentSize(indentSize) {}
-    
-    virtual ~PrintVisitor() {}
 
     void visitBinaryOpNode(BinaryOpNode* node) override {
         _buffer << "(";
@@ -111,7 +109,7 @@ struct PrintVisitor : public AstBaseVisitor {
         Scope::VarIterator varIterator(node->scope());
         iterate(varIterator, [&](AstVar* var) {
             indent();
-            _buffer << var->type() 
+            _buffer << var->type()
                     << " "
                     << var->name()
                     << ";"
@@ -124,16 +122,16 @@ struct PrintVisitor : public AstBaseVisitor {
             fun->node()->visit(this);
             _buffer << endl;
         });
-        
+
         for (size_t i = 0; i < node->nodes(); i++) {
             AstNode* currNode = node->nodeAt(i);
             if (currNode->isNativeCallNode()) continue;
-            
+
             indent();
-            
+
             currNode->visit(this);
-            if (!(currNode->isForNode() 
-                || currNode->isWhileNode() 
+            if (!(currNode->isForNode()
+                || currNode->isWhileNode()
                 || currNode->isIfNode()
                 || currNode->isFunctionNode())) {
                 _buffer << ";";
@@ -143,32 +141,44 @@ struct PrintVisitor : public AstBaseVisitor {
         }
     }
 
+    void visitNativeCallNode(NativeCallNode* node) override {
+        _buffer << " native " << "'" << node->nativeName() << "'";
+    }
+
     void visitFunctionNode(FunctionNode* node) override {
         if (node->name() == AstFunction::top_name) {
             visitTopBlock(node->body());
             return;
         }
 
-        _buffer << "function " << node->returnType() << " " <<  node->name() << "("; 
+        _buffer << "function " << node->returnType() << " " <<  node->name() << "(";
 
         printWithSeparator(node->parametersNumber(), [&](size_t i) {
             _buffer << node->parameterType(i) << " " << node->parameterName(i);
         });
 
-        _buffer << ") {" << endl;
-        
-        increaseIndent();
-        node->body()->visit(this);
-        decreaseIndent();
+        _buffer << ")";
 
-        indent();
-        _buffer << "}";
+        if (node->body()->nodeAt(0)->isNativeCallNode()) {
+            _buffer << " ";
+            node->body()->nodeAt(0)->visit(this);
+            _buffer << ";";
+        } else {
+            _buffer << " {" << endl;
+
+            increaseIndent();
+            node->body()->visit(this);
+            decreaseIndent();
+
+            indent();
+            _buffer << "}";
+        }
     }
 
     void visitStoreNode(StoreNode* node) override {
-        _buffer << node->var()->name() 
-                << ' ' 
-                << node->op() 
+        _buffer << node->var()->name()
+                << ' '
+                << node->op()
                 << ' ';
         node->value()->visit(this);
     }
@@ -192,12 +202,12 @@ struct PrintVisitor : public AstBaseVisitor {
     void visitForNode(ForNode* node) override {
         _buffer << "for (" << node->var()->name() << " in ";
         node->inExpr()->visit(this);
-        _buffer << ") {" << endl; 
-        
+        _buffer << ") {" << endl;
+
         increaseIndent();
         node->body()->visit(this);
         decreaseIndent();
-        
+
         indent();
         _buffer << "}" << endl;
     }
@@ -205,12 +215,12 @@ struct PrintVisitor : public AstBaseVisitor {
     void visitWhileNode(WhileNode* node) override {
         _buffer << "while (";
         node->whileExpr()->visit(this);
-        _buffer << ") {" << endl; 
-        
+        _buffer << ") {" << endl;
+
         increaseIndent();
         node->loopBlock()->visit(this);
         decreaseIndent();
-        
+
         indent();
         _buffer << "}" << endl;
     }
@@ -219,28 +229,28 @@ struct PrintVisitor : public AstBaseVisitor {
         indent();
         _buffer << "if (";
         node->ifExpr()->visit(this);
-        _buffer << ") {" << endl; 
-        
+        _buffer << ") {" << endl;
+
         increaseIndent();
         node->thenBlock()->visit(this);
         decreaseIndent();
-        
+
         indent();
         _buffer << "}";
         if (node->elseBlock()) {
             _buffer << " else {" << endl;;
-            
+
             increaseIndent();
             node->elseBlock()->visit(this);
             decreaseIndent();
-            
+
             indent();
             _buffer << "}";
         }
 
     }
 
-    void visitCallNode(CallNode* node) {
+    void visitCallNode(CallNode* node) override {
         _buffer << node->name() << "(";
 
         printWithSeparator(node->parametersNumber(), [&](size_t i) {
@@ -250,7 +260,7 @@ struct PrintVisitor : public AstBaseVisitor {
         cout << ")";
     }
 
-    void visitPrintNode(PrintNode* node) {
+    void visitPrintNode(PrintNode* node) override {
         _buffer << "print(";
 
         printWithSeparator(node->operands(), [&](size_t i) {
@@ -260,7 +270,7 @@ struct PrintVisitor : public AstBaseVisitor {
         cout << ")";
     }
 
-    void visitReturnNode(ReturnNode* node) {
+    void visitReturnNode(ReturnNode* node) override {
         _buffer << "return";
         if (node->returnExpr()) {
             _buffer << " ";
@@ -363,7 +373,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Code* code = 0;
+    Code* code = nullptr;
     unique_ptr<Status> translateStatus{translator->translate(program, &code)};
 
     if (translateStatus->isError()) {
