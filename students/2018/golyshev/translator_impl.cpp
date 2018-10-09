@@ -1,4 +1,5 @@
 #include <mathvm.h>
+#include "pretty_print_translator_impl.hpp"
 
 namespace mathvm {
 
@@ -11,7 +12,7 @@ Translator* Translator::create(const string& impl) {
        //return new MachCodeTranslatorImpl();
    }
    if (impl == "printer") {
-       //return new SourceTranslatorImpl();
+       return new PrettyPrintTranslatorImpl(cout);
    }
    return nullptr;
 }
