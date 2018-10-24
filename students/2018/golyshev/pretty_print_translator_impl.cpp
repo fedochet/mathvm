@@ -1,17 +1,19 @@
 #include "pretty_print_translator_impl.hpp"
 
+#include <sstream>
+
 using namespace std;
 using namespace mathvm;
 
 template<typename Iterator, typename Consumer>
-void iterate(Iterator& it, Consumer const& p) {
+static void iterate(Iterator& it, Consumer const& p) {
     while (it.hasNext()) {
         p(it.next());
     }
 }
 
 template<typename Printer>
-void printWithSeparator(ostream& _buffer, size_t times, Printer const& p) {
+static void printWithSeparator(ostream& _buffer, size_t times, Printer const& p) {
     bool first = true;
     for (size_t i = 0; i < times; i++) {
         if (!first) {
@@ -23,7 +25,7 @@ void printWithSeparator(ostream& _buffer, size_t times, Printer const& p) {
     }
 }
 
-string escape(const string& s) {
+static string escape(const string& s) {
     stringstream ss;
     for (char c : s) {
         switch (c) {
@@ -50,7 +52,7 @@ string escape(const string& s) {
     return ss.str();
 }
 
-ostream& operator<<(ostream& o, VarType type) {
+static ostream& operator<<(ostream& o, VarType type) {
     switch (type) {
         case VT_INVALID:
             o << "invalid";
@@ -72,7 +74,7 @@ ostream& operator<<(ostream& o, VarType type) {
     return o;
 }
 
-ostream& operator<<(ostream& o, TokenKind kind) {
+static ostream& operator<<(ostream& o, TokenKind kind) {
 #define PRINT_OP(t, s, p) \
         case t: o << (s); \
         break;
@@ -267,6 +269,7 @@ void PrettyPrintTranslatorImpl::visitIfNode(IfNode* node) {
 
     indent();
     _buffer << "}";
+
     if (node->elseBlock()) {
         _buffer << " else {" << endl;;
 
